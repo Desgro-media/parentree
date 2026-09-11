@@ -594,9 +594,20 @@ em { font-style: italic; }
 .testi__who span { font-size: .78rem; color: var(--muted); }
 
 /* ---------- instagram ---------- */
-.ig-grid { display: grid; gap: 8px; grid-template-columns: repeat(3, 1fr); }
-@media (min-width: 720px) { .ig-grid { grid-template-columns: repeat(6, 1fr); } }
-.ig-grid a { position: relative; aspect-ratio: 1; border-radius: var(--r-sm); overflow: hidden; background: var(--ivory-deep); }
+/* collage mosaic — mixed tile sizes via grid spans, dense packing fills the gaps */
+.ig-grid {
+  display: grid; gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 108px;
+  grid-auto-flow: dense;
+}
+@media (min-width: 720px) { .ig-grid { grid-template-columns: repeat(6, 1fr); grid-auto-rows: 168px; } }
+.ig-grid a:nth-child(1) { grid-column: span 2; grid-row: span 2; }
+.ig-grid a:nth-child(4) { grid-column: span 2; }
+.ig-grid a:nth-child(6) { grid-row: span 2; }
+.ig-grid a:nth-child(8) { grid-column: span 2; grid-row: span 2; }
+.ig-grid a:nth-child(11) { grid-column: span 2; }
+.ig-grid a { position: relative; border-radius: var(--r-sm); overflow: hidden; background: var(--ivory-deep); }
 .ig-grid img { width: 100%; height: 100%; object-fit: cover; transition: transform .5s var(--ease); }
 .ig-grid a::after { content: ""; position: absolute; inset: 0; background: rgba(47, 55, 41, .26); opacity: 0; transition: opacity .3s; }
 .ig-grid a:hover img { transform: scale(1.08); }
