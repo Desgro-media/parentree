@@ -42,7 +42,7 @@
         <aside class="summary">
           <h3>Order summary</h3>
           <div class="summary__line"><span>Subtotal (${count} ${count === 1 ? "item" : "items"})</span><span>${money(sub)}</span></div>
-          ${saved > 0 ? `<div class="summary__line" style="color:var(--sale);font-weight:600"><span>You save</span><span>−${money(saved)}</span></div>` : ""}
+          ${saved > 0 ? `<div class="summary__line" style="color:var(--clay);font-weight:600"><span>You save</span><span>−${money(saved)}</span></div>` : ""}
           <div class="summary__line"><span>Delivery</span><span>Free</span></div>
 
           <div class="summary__note">
@@ -121,7 +121,7 @@
         const total = Math.round(sub * (1 - codes[code]));
         $("#grandTotal").textContent = money(total);
         msg.textContent = `“${code}” applied — ${codes[code] * 100}% off.`;
-        msg.style.color = "var(--sky-700)";
+        msg.style.color = "var(--sage-700)";
       } else {
         msg.textContent = code ? `“${code}” isn’t a valid code.` : "Enter a code to apply.";
         msg.style.color = "var(--muted)";

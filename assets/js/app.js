@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Parentree Organics — shared runtime
+   Momira Organic — shared runtime
    Chrome injection · cart + wishlist state · UI behaviour · shared renderers
    ========================================================================== */
 (function () {
@@ -202,9 +202,9 @@
     header.innerHTML = `
       <div class="container header-inner">
         <button class="icon-btn" id="menuToggle" aria-label="Open menu">${icon("menu")}</button>
-        <a class="brand" href="index.html" aria-label="Parentree Organics — home">
-          <span class="brand__mark">${leafMark()}</span>
-          <span class="brand__name"><b>Parentree</b><span>Organics</span></span>
+        <a class="brand" href="index.html" aria-label="Momira Organic — home">
+          <span class="brand__mark">${sproutMark()}</span>
+          <span class="brand__name"><b>momira</b><span>Organic</span></span>
         </a>
         <nav aria-label="Primary"><ul class="primary-nav">${NAV.map(navItem).join("")}</ul></nav>
         <div class="header-actions">
@@ -227,16 +227,16 @@
       <div class="drawer-scrim" data-scrim></div>
       <aside class="mobile-drawer" id="mobileDrawer" aria-label="Menu">
         <div class="mobile-drawer__top">
-          <a class="brand" href="index.html"><span class="brand__mark">${leafMark()}</span>
-            <span class="brand__name"><b>Parentree</b><span>Organics</span></span></a>
+          <a class="brand" href="index.html"><span class="brand__mark">${sproutMark()}</span>
+            <span class="brand__name"><b>momira</b><span>Organic</span></span></a>
           <button class="icon-btn" data-drawer-close aria-label="Close menu">${icon("close")}</button>
         </div>
         <nav class="mobile-drawer__nav">${NAV.map(mDrawerItem).join("")}
           <a href="shop.html">Shop all products ${icon("chevRight")}</a>
         </nav>
         <div class="mobile-drawer__foot">
-          <a href="https://wa.me/919510633232">${icon("whatsapp")} +91 95106 33232</a>
-          <a href="mailto:parentreeorganics@gmail.com">${icon("mail")} parentreeorganics@gmail.com</a>
+          <a href="https://wa.me/919876543210">${icon("whatsapp")} +91 98765 43210</a>
+          <a href="mailto:hello@momiraorganic.com">${icon("mail")} hello@momiraorganic.com</a>
         </div>
       </aside>
 
@@ -278,10 +278,11 @@
     renderCartDrawer();
   }
 
-  function leafMark() {
+  /* two-leaf sprout — echoes the mark above the "i" in the momira wordmark */
+  function sproutMark() {
     return `<svg viewBox="0 0 32 32" fill="none" aria-hidden="true">
-      <path d="M16 3C9 6 5 12 5 19c0 5 3 9 8 10 0-7 1-12 4-16-2 5-2 11-2 16 6-1 12-6 12-15 0-5-4-9-11-11Z" fill="currentColor"/>
-      <path d="M16 29c0-6 0-11 2-15" stroke="#F7FBFF" stroke-width="1.4" stroke-linecap="round"/></svg>`;
+      <path d="M16 29C10 28 6 21 7 11c8 2 10 10 9 18Z" fill="currentColor"/>
+      <path d="M16 29C22 28 26 21 25 11c-8 2-10 10-9 18Z" fill="currentColor"/></svg>`;
   }
   function navItem(n) {
     if (n.mega) {
@@ -303,13 +304,13 @@
     return `<footer class="site-footer">
       <div class="container footer-top">
         <div class="footer-brand">
-          <a class="brand" href="index.html"><span class="brand__mark" style="color:var(--sky-300)">${leafMark()}</span>
-            <span class="brand__name"><b>Parentree</b><span>Organics</span></span></a>
-          <p>GOTS-certified organic cotton essentials for newborns and little ones — made soft, made safe, made to be handed down.</p>
+          <a class="brand" href="index.html"><span class="brand__mark" style="color:var(--sage-300)">${sproutMark()}</span>
+            <span class="brand__name"><b>momira</b><span>Organic</span></span></a>
+          <p>GOTS-certified organic cotton sleepwear for newborns and little ones — made soft, made safe, made to be handed down.</p>
           <div class="footer-social">
             <a href="https://instagram.com" aria-label="Instagram">${icon("instagram")}</a>
-            <a href="https://wa.me/919510633232" aria-label="WhatsApp">${icon("whatsapp")}</a>
-            <a href="mailto:parentreeorganics@gmail.com" aria-label="Email">${icon("mail")}</a>
+            <a href="https://wa.me/919876543210" aria-label="WhatsApp">${icon("whatsapp")}</a>
+            <a href="mailto:hello@momiraorganic.com" aria-label="Email">${icon("mail")}</a>
           </div>
         </div>
         <div class="footer-col">
@@ -330,13 +331,13 @@
         </div>
         <div class="footer-col">
           <h4>Reach us</h4>
-          <a href="https://wa.me/919510633232">+91 95106 33232</a>
-          <a href="mailto:parentreeorganics@gmail.com">parentreeorganics@gmail.com</a>
+          <a href="https://wa.me/919876543210">+91 98765 43210</a>
+          <a href="mailto:hello@momiraorganic.com">hello@momiraorganic.com</a>
           <a href="#">Mon–Sat, 10am–6pm IST</a>
         </div>
       </div>
       <div class="container footer-bottom">
-        <span>© ${new Date().getFullYear()} Parentree Organics. Redesign concept.</span>
+        <span>© ${new Date().getFullYear()} Momira Organic. Redesign concept.</span>
         <span class="pay">Secure checkout <span>UPI</span><span>VISA</span><span>RuPay</span><span>COD</span></span>
       </div>
     </footer>`;

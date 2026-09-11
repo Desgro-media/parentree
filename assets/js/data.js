@@ -1,14 +1,14 @@
 /* ===========================================================================
-   Parentree Organics — catalogue + site content
+   Momira Organic — catalogue + site content
    Static data layer. All prices in INR. Images live in /assets/img/products.
    =========================================================================== */
 
 window.SITE = {
-  name: "Parentree",
-  tagline: "Organics",
-  phone: "+91 95106 33232",
-  whatsapp: "919510633232",
-  email: "parentreeorganics@gmail.com",
+  name: "Momira",
+  tagline: "Organic",
+  phone: "+91 98765 43210",
+  whatsapp: "919876543210",
+  email: "hello@momiraorganic.com",
   freeGiftThreshold: 2600,
   currency: "₹",
 };

@@ -12,7 +12,7 @@
     "2-3y":  ["2-3y"],
   };
   const CAT_COPY = {
-    all:        ["All products", "Every Parentree piece — GOTS-certified organic cotton, plant-dyed, made to be handed down."],
+    all:        ["All products", "Every Momira piece — GOTS-certified organic cotton, plant-dyed, made to be handed down."],
     nightwear:  ["Night Suits", "Crinkle-muslin and cotton night suits for 6 months to 6 years — loose, breathable, iron-free."],
     frocks:     ["Frocks & Jablas", "Tie-shoulder jablas and knot frocks in single-layer muslin. Open flat, grow with your baby."],
     rompers:    ["Rompers & Sets", "Zip sleepsuits and co-ords for easy changes and easy mornings."],
@@ -58,7 +58,7 @@
     $("#shopTitle").textContent = title;
     $("#shopDesc").textContent = desc;
     $("#crumbNow").textContent = title;
-    document.title = title + " — Parentree Organics";
+    document.title = title + " — Momira Organic";
     $("#shopCount").textContent = `${list.length} ${list.length === 1 ? "style" : "styles"}`
       + (state.age ? ` · ${state.age.replace("m", " months").replace("y", " years")}` : "");
 

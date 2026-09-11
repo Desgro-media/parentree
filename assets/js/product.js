@@ -18,7 +18,7 @@
   }
 
   const catLabel = (window.CATEGORIES.find((c) => c.slug === p.cat) || {}).label || "";
-  document.title = p.name + " — Parentree Organics";
+  document.title = p.name + " — Momira Organic";
 
   const state = {
     color: p.colors && p.colors[0] ? p.colors[0][0] : "",
