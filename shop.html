@@ -27,6 +27,31 @@
       <div class="cat-rail" id="shopCats"></div>
       <div class="shop-toolbar__end">
         <span class="shop-toolbar__count" id="shopCount">—</span>
+
+        <div class="price-filter">
+          <button class="chip" id="priceBtn" type="button" aria-expanded="false" aria-controls="pricePop">
+            <span id="priceBtnLabel">Price</span> SPRITE_CHEVDOWN
+          </button>
+          <div class="price-pop" id="pricePop" hidden>
+            <div class="price-pop__row">
+              <span>₹<span id="priceMinLabel">0</span></span>
+              <span>₹<span id="priceMaxLabel">4000</span></span>
+            </div>
+            <div class="price-slider">
+              <div class="price-slider__track"></div>
+              <div class="price-slider__fill" id="priceFill"></div>
+              <input type="range" id="priceMin" min="0" max="4000" step="100" value="0" aria-label="Minimum price">
+              <input type="range" id="priceMax" min="0" max="4000" step="100" value="4000" aria-label="Maximum price">
+            </div>
+            <div class="price-pop__presets">
+              <button type="button" data-preset="0,1000">Under ₹1,000</button>
+              <button type="button" data-preset="1000,2000">₹1,000–2,000</button>
+              <button type="button" data-preset="2000,4000">₹2,000+</button>
+            </div>
+            <button class="link-more" id="priceReset" type="button">Reset price SPRITE_CLOSE</button>
+          </div>
+        </div>
+
         <div class="select-wrap">
           <select id="sortSelect" aria-label="Sort products">
             <option value="popular">Most loved</option>

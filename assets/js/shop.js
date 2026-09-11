@@ -22,14 +22,24 @@
     essentials: ["Newborn Essentials", "Napkins, wipes, bibs, towels and sheets — the unglamorous heroes of the changing table."],
   };
 
+  const PRICE_MIN = 0, PRICE_MAX = 4000;
+  const clampPrice = (raw, fallback) => {
+    if (raw === null || raw === undefined || raw === "") return fallback; // Number(null) is 0, not NaN — guard explicitly
+    const n = Number(raw);
+    return Number.isFinite(n) ? Math.min(PRICE_MAX, Math.max(PRICE_MIN, n)) : fallback;
+  };
+
   const params = new URLSearchParams(location.search);
   let state = {
     cat: params.get("category") || "all",
     age: params.get("age") || "",
     sort: params.get("sort") || "popular",
     q: (params.get("q") || "").toLowerCase(),
+    minPrice: clampPrice(params.get("minPrice"), PRICE_MIN),
+    maxPrice: clampPrice(params.get("maxPrice"), PRICE_MAX),
   };
   if (!CAT_COPY[state.cat]) state.cat = "all";
+  if (state.minPrice > state.maxPrice) [state.minPrice, state.maxPrice] = [state.maxPrice, state.minPrice];
   $("#sortSelect").value = ["popular", "new", "price-asc", "price-desc", "discount"].includes(state.sort) ? state.sort : "popular";
 
   /* category chips */
@@ -45,6 +55,9 @@
       list = list.filter((p) => (p.sizes || []).some((s) => want.includes(s)));
     }
     if (state.q) list = list.filter((p) => (p.name + " " + p.cat).toLowerCase().includes(state.q));
+    if (state.minPrice > PRICE_MIN || state.maxPrice < PRICE_MAX) {
+      list = list.filter((p) => p.price >= state.minPrice && p.price <= state.maxPrice);
+    }
 
     switch (state.sort) {
       case "price-asc":  list.sort((a, b) => a.price - b.price); break;
@@ -78,6 +91,8 @@
     if (state.age) u.searchParams.set("age", state.age);
     if (state.sort !== "popular") u.searchParams.set("sort", state.sort);
     if (state.q) u.searchParams.set("q", state.q);
+    if (state.minPrice > PRICE_MIN) u.searchParams.set("minPrice", state.minPrice);
+    if (state.maxPrice < PRICE_MAX) u.searchParams.set("maxPrice", state.maxPrice);
     history.replaceState(null, "", u);
   }
 
@@ -94,5 +109,72 @@
   });
   $("#sortSelect").addEventListener("change", (e) => { state.sort = e.target.value; apply(); });
 
-  document.addEventListener("chrome:ready", apply, { once: true });
+  /* -------------------------------------------------------- price filter */
+  function initPriceFilter() {
+    const btn = $("#priceBtn"), btnLabel = $("#priceBtnLabel"), pricePop = $("#pricePop");
+    const minInput = $("#priceMin"), maxInput = $("#priceMax");
+    const minLabel = $("#priceMinLabel"), maxLabel = $("#priceMaxLabel");
+    const fill = $("#priceFill");
+    const presets = [...document.querySelectorAll(".price-pop__presets button")];
+
+    const syncUI = () => {
+      minInput.value = state.minPrice;
+      maxInput.value = state.maxPrice;
+      minLabel.textContent = state.minPrice.toLocaleString("en-IN");
+      maxLabel.textContent = state.maxPrice === PRICE_MAX ? `${PRICE_MAX.toLocaleString("en-IN")}+` : state.maxPrice.toLocaleString("en-IN");
+      const left = (state.minPrice / PRICE_MAX) * 100;
+      const right = (state.maxPrice / PRICE_MAX) * 100;
+      fill.style.left = left + "%";
+      fill.style.width = Math.max(0, right - left) + "%";
+      const filtered = state.minPrice > PRICE_MIN || state.maxPrice < PRICE_MAX;
+      btn.classList.toggle("is-active", filtered);
+      btnLabel.textContent = filtered
+        ? `₹${state.minPrice.toLocaleString("en-IN")}–${state.maxPrice === PRICE_MAX ? PRICE_MAX.toLocaleString("en-IN") + "+" : state.maxPrice.toLocaleString("en-IN")}`
+        : "Price";
+      presets.forEach((b) => {
+        const [pmin, pmax] = b.dataset.preset.split(",").map(Number);
+        b.classList.toggle("is-active", pmin === state.minPrice && pmax === state.maxPrice);
+      });
+    };
+
+    const openPop = () => { pricePop.hidden = false; btn.setAttribute("aria-expanded", "true"); };
+    const closePop = () => { pricePop.hidden = true; btn.setAttribute("aria-expanded", "false"); };
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      pricePop.hidden ? openPop() : closePop();
+    });
+    document.addEventListener("click", (e) => {
+      if (!pricePop.hidden && !pricePop.contains(e.target) && e.target !== btn) closePop();
+    });
+    document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePop(); });
+
+    const liveDrag = (which) => {
+      // keep the two handles from crossing — no minimum gap required
+      let mn = Number(minInput.value), mx = Number(maxInput.value);
+      if (which === "min" && mn > mx) { mn = mx; minInput.value = mn; }
+      if (which === "max" && mx < mn) { mx = mn; maxInput.value = mx; }
+      state.minPrice = mn; state.maxPrice = mx;
+      syncUI();
+    };
+    minInput.addEventListener("input", () => liveDrag("min"));
+    maxInput.addEventListener("input", () => liveDrag("max"));
+    minInput.addEventListener("change", apply);
+    maxInput.addEventListener("change", apply);
+
+    presets.forEach((b) => b.addEventListener("click", () => {
+      const [pmin, pmax] = b.dataset.preset.split(",").map(Number);
+      state.minPrice = pmin; state.maxPrice = pmax;
+      syncUI(); apply();
+    }));
+
+    $("#priceReset").addEventListener("click", () => {
+      state.minPrice = PRICE_MIN; state.maxPrice = PRICE_MAX;
+      syncUI(); apply(); closePop();
+    });
+
+    syncUI();
+  }
+
+  document.addEventListener("chrome:ready", () => { initPriceFilter(); apply(); }, { once: true });
 })();
