@@ -4,6 +4,9 @@
   const $ = (s) => document.querySelector(s);
   const set = (sel, html) => { const el = $(sel); if (el) el.innerHTML = html; };
 
+  Promise.resolve(window.Catalog && window.Catalog.ready).then(main);
+
+  function main() {
   /* hero rating */
   { const h = $("[data-hero-stars]"); if (h) h.replaceWith(el(window.stars(5, 11))); }
   function el(html) { const t = document.createElement("template"); t.innerHTML = html.trim(); return t.content.firstChild; }
@@ -68,4 +71,5 @@
 
   window.hydrateIcons(document.querySelector("main"));
   window.initReveal();
+  }
 })();

@@ -4,6 +4,9 @@
   const $ = (s, r = document) => r.querySelector(s);
   const money = window.money;
 
+  Promise.resolve(window.Catalog && window.Catalog.ready).then(main);
+
+  function main() {
   const id = new URLSearchParams(location.search).get("id");
   const p = window.getProduct(id);
   const root = $("#pdpRoot");
@@ -34,7 +37,7 @@
       <div class="pdp__info">
         <span class="pdp__cat">${catLabel}</span>
         <h1 class="pdp__title">${p.name}</h1>
-        <div class="rating-line">${window.stars(p.rating)} <span>${p.rating.toFixed(1)} · ${p.reviews} reviews</span></div>
+        ${p.reviews ? `<div class="rating-line">${window.stars(p.rating)} <span>${p.rating.toFixed(1)} · ${p.reviews} reviews</span></div>` : ""}
 
         <div class="pdp__price" style="margin-top:16px">
           <span class="now">${money(p.price)}</span>
@@ -161,4 +164,5 @@
     // reflect wishlist state
     document.dispatchEvent(new CustomEvent("store:change"));
   }, { once: true });
+  }
 })();
