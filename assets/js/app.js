@@ -89,6 +89,8 @@
   const $$ = (s, r = document) => [...r.querySelectorAll(s)];
   const money = (n) => "₹" + Number(n).toLocaleString("en-IN");
   window.money = money;
+  const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
+    ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 
   function stars(rating, size) {
     const full = Math.round(rating);
@@ -209,6 +211,10 @@
         <nav aria-label="Primary"><ul class="primary-nav">${NAV.map(navItem).join("")}</ul></nav>
         <div class="header-actions">
           <button class="icon-btn search-open" aria-label="Search">${icon("search")}</button>
+          <div class="account-wrap">
+            <button class="icon-btn" id="accountToggle" aria-label="Account" aria-haspopup="true">${icon("user")}</button>
+            <div class="account-pop" id="accountPop" hidden></div>
+          </div>
           <a class="icon-btn" href="wishlist.html" aria-label="Wishlist">${icon("heart")}
             <span class="icon-btn__count" data-wish-count>0</span></a>
           <button class="icon-btn" id="cartToggle" aria-label="Cart">${icon("bag")}
@@ -231,6 +237,7 @@
             <span class="brand__name"><b>momira</b><span>Organic</span></span></a>
           <button class="icon-btn" data-drawer-close aria-label="Close menu">${icon("close")}</button>
         </div>
+        <div class="m-account" id="mDrawerAccount"></div>
         <nav class="mobile-drawer__nav">${NAV.map(mDrawerItem).join("")}
           <a href="shop.html">Shop all products ${icon("chevRight")}</a>
         </nav>
@@ -259,6 +266,40 @@
         <div id="cartDrawerBody" style="display:flex;flex-direction:column;flex:1;min-height:0"></div>
       </aside>
 
+      <div class="auth-modal" id="authModal" role="dialog" aria-modal="true" aria-label="Sign in">
+        <div class="auth-modal__box">
+          <button class="icon-btn auth-modal__close" id="authClose" aria-label="Close">${icon("close")}</button>
+          <div class="auth-modal__head">
+            <span class="auth-modal__mark">${sproutMark()}</span>
+            <h3 id="authTitle">Welcome to Momira</h3>
+            <p id="authSubtitle">Sign in or create an account.</p>
+          </div>
+          <div class="auth-tabs">
+            <button type="button" class="auth-tab is-active" data-auth-tab="signin">Sign in</button>
+            <button type="button" class="auth-tab" data-auth-tab="signup">Create account</button>
+          </div>
+          <form id="authFormSignin" class="auth-form" novalidate>
+            <label class="field"><span>Email</span>
+              <input type="email" name="email" required autocomplete="email" placeholder="you@email.com"></label>
+            <label class="field"><span>Password</span>
+              <input type="password" name="password" required autocomplete="current-password" placeholder="••••••••"></label>
+            <p class="auth-error" id="authErrorSignin" hidden></p>
+            <button class="btn btn--ink btn--block" type="submit">Sign in</button>
+          </form>
+          <form id="authFormSignup" class="auth-form" novalidate hidden>
+            <label class="field"><span>Name</span>
+              <input type="text" name="name" required autocomplete="name" placeholder="Your name"></label>
+            <label class="field"><span>Email</span>
+              <input type="email" name="email" required autocomplete="email" placeholder="you@email.com"></label>
+            <label class="field"><span>Password</span>
+              <input type="password" name="password" required autocomplete="new-password" placeholder="At least 6 characters" minlength="6"></label>
+            <p class="auth-error" id="authErrorSignup" hidden></p>
+            <button class="btn btn--ink btn--block" type="submit">Create account</button>
+          </form>
+          <p class="auth-modal__foot">By continuing you agree to Momira's Terms &amp; Privacy Policy.</p>
+        </div>
+      </div>
+
       <nav class="bottom-nav" aria-label="Mobile">
         <a href="index.html" data-nav="home"><span class="bn-ico">${icon("nHome")}</span>Home</a>
         <a href="shop.html" data-nav="shop"><span class="bn-ico">${icon("nGrid")}</span>Shop</a>
@@ -274,6 +315,7 @@
     $$(".bottom-nav a").forEach((a) => { if (a.dataset.nav === page) a.classList.add("is-active"); });
 
     wireChrome();
+    wireAuth();
     syncBadges();
     renderCartDrawer();
   }
@@ -349,13 +391,18 @@
     const drawer = $("#mobileDrawer");
     const search = $("#searchPanel");
     const cart = $("#cartDrawer");
+    const authModal = $("#authModal");
     const openScrim = () => { scrim.classList.add("open"); document.body.classList.add("no-scroll"); };
     const closeAll = () => {
+      const wasAuthOpen = authModal.classList.contains("open");
       scrim.classList.remove("open");
       drawer.classList.remove("open"); cart.classList.remove("open"); search.classList.remove("open");
+      authModal.classList.remove("open");
       document.body.classList.remove("no-scroll");
+      if (wasAuthOpen) window.Auth.clearPending();
     };
     window.__closeChrome = closeAll;
+    window.__openScrim = openScrim;
 
     $("#menuToggle").addEventListener("click", () => { openScrim(); drawer.classList.add("open"); });
     $("#cartToggle").addEventListener("click", () => { openScrim(); cart.classList.add("open"); renderCartDrawer(); });
@@ -392,6 +439,119 @@
     };
     input.addEventListener("input", runSearch);
     runSearch();
+  }
+
+  /* ----------------------------------------------------------------- auth */
+  function wireAuth() {
+    const modal = $("#authModal");
+    const tabSignin = modal.querySelector('[data-auth-tab="signin"]');
+    const tabSignup = modal.querySelector('[data-auth-tab="signup"]');
+    const formSignin = $("#authFormSignin");
+    const formSignup = $("#authFormSignup");
+    const titleEl = $("#authTitle");
+    const subtitleEl = $("#authSubtitle");
+    const accountToggle = $("#accountToggle");
+    const accountPop = $("#accountPop");
+    const mDrawerAccount = $("#mDrawerAccount");
+
+    function setTab(mode) {
+      const signup = mode === "signup";
+      tabSignin.classList.toggle("is-active", !signup);
+      tabSignup.classList.toggle("is-active", signup);
+      formSignin.hidden = signup;
+      formSignup.hidden = !signup;
+      $("#authErrorSignin").hidden = true;
+      $("#authErrorSignup").hidden = true;
+    }
+    tabSignin.addEventListener("click", () => setTab("signin"));
+    tabSignup.addEventListener("click", () => setTab("signup"));
+
+    function openAuth(mode, reason) {
+      setTab(mode || "signin");
+      if (reason === "checkout") {
+        titleEl.textContent = "Sign in to check out";
+        subtitleEl.textContent = "Create an account or sign in to complete your order.";
+      } else {
+        titleEl.textContent = "Welcome to Momira";
+        subtitleEl.textContent = "Sign in or create an account.";
+      }
+      formSignin.reset(); formSignup.reset();
+      accountPop.hidden = true;
+      window.__openScrim();
+      modal.classList.add("open");
+      setTimeout(() => {
+        const f = modal.querySelector(".auth-form:not([hidden])");
+        const i = f && f.querySelector("input");
+        if (i) i.focus();
+      }, 60);
+    }
+
+    $("#authClose").addEventListener("click", () => window.__closeChrome());
+
+    function handleResult(r, errEl) {
+      if (!r.ok) { errEl.textContent = r.error; errEl.hidden = false; return; }
+      errEl.hidden = true;
+      const hadPending = window.Auth.hasPending();
+      const first = window.Auth.currentUser().name.split(" ")[0];
+      window.Auth.resolvePending();
+      window.__closeChrome();
+      if (!hadPending) toast(`Signed in — welcome, ${first}!`);
+    }
+    formSignin.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fd = new FormData(formSignin);
+      handleResult(window.Auth.login({ email: fd.get("email"), password: fd.get("password") }), $("#authErrorSignin"));
+    });
+    formSignup.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const fd = new FormData(formSignup);
+      handleResult(window.Auth.signup({ name: fd.get("name"), email: fd.get("email"), password: fd.get("password") }), $("#authErrorSignup"));
+    });
+
+    /* header account icon + popover */
+    accountToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      if (!window.Auth.isLoggedIn()) { openAuth("signin"); return; }
+      accountPop.hidden = !accountPop.hidden;
+    });
+    accountPop.addEventListener("click", (e) => {
+      if (e.target.closest("[data-signout]")) {
+        window.Auth.logout(); accountPop.hidden = true; toast("Signed out");
+      } else if (e.target.closest("[data-signin-pop]")) {
+        accountPop.hidden = true; openAuth("signin");
+      }
+    });
+    document.addEventListener("click", (e) => {
+      if (!accountPop.hidden && !accountPop.contains(e.target) && !e.target.closest("#accountToggle")) accountPop.hidden = true;
+    });
+
+    /* mobile drawer account row */
+    if (mDrawerAccount) {
+      mDrawerAccount.addEventListener("click", (e) => {
+        if (e.target.closest("[data-signout]")) window.Auth.logout();
+        else if (e.target.closest("[data-signin]")) { window.__closeChrome(); openAuth("signin"); }
+      });
+    }
+
+    function render() {
+      const u = window.Auth.currentUser();
+      accountToggle.classList.toggle("is-authed", !!u);
+      accountPop.innerHTML = u
+        ? `<div class="account-pop__hi">Hi, ${escHtml(u.name.split(" ")[0])}</div>
+           <button class="btn btn--light btn--sm btn--block" data-signout>Sign out</button>`
+        : `<p class="account-pop__hint">Sign in to save your details and check out faster.</p>
+           <button class="btn btn--ink btn--sm btn--block" data-signin-pop>Sign in</button>`;
+      if (mDrawerAccount) {
+        mDrawerAccount.innerHTML = u
+          ? `<div class="m-account__hi">${icon("nUser")}<span>Hi, ${escHtml(u.name.split(" ")[0])}</span></div>
+             <button class="chip" data-signout>Sign out</button>`
+          : `<button class="btn btn--ink btn--block" data-signin>Sign in / Create account</button>`;
+      }
+    }
+
+    document.addEventListener("auth:change", render);
+    document.addEventListener("auth:required", (e) => openAuth("signin", e.detail && e.detail.reason));
+    render();
   }
 
   /* --------------------------------------------------------------- badges */
@@ -487,7 +647,7 @@
       <div class="card__body">
         <span class="card__cat">${catLabel}</span>
         <h3 class="card__name"><a href="product.html?id=${p.id}">${p.name}</a></h3>
-        <div class="rating-line">${stars(p.rating, 12)} <span>(${p.reviews})</span></div>
+        ${p.reviews ? `<div class="rating-line">${stars(p.rating, 12)} <span>(${p.reviews})</span></div>` : ""}
         ${sw ? `<div class="card__swatches">${sw}</div>` : ""}
         <div class="card__meta">
           <span class="card__price">${money(p.price)}</span>
@@ -549,6 +709,12 @@
     buildChrome();
     hydrateIcons(document.body);
     initReveal();
-    document.dispatchEvent(new CustomEvent("chrome:ready"));
+    /* catalog sync (Shopify or the static fallback) may still be in flight —
+       wait for it so pages that read window.PRODUCTS on chrome:ready see
+       the final catalogue rather than a half-loaded one. */
+    Promise.resolve(window.Catalog && window.Catalog.ready).then(() => {
+      renderCartDrawer();
+      document.dispatchEvent(new CustomEvent("chrome:ready"));
+    });
   });
 })();

@@ -101,6 +101,31 @@
     </article>`;
   }
 
+  async function goToCheckout() {
+    if (!window.Catalog || !window.Catalog.isLive()) {
+      window.toast("This is a redesign concept — checkout isn’t wired up.", "Keep browsing", "shop.html");
+      return;
+    }
+    const lines = [];
+    for (const l of S.cart) {
+      const p = window.getProduct(l.id);
+      const variantId = p && p.variantIndex ? (p.variantIndex[(l.color || "") + "::" + (l.size || "")] || p.variantId) : null;
+      if (!variantId) {
+        window.toast("This is a redesign concept — checkout isn’t wired up.", "Keep browsing", "shop.html");
+        return;
+      }
+      lines.push({ variantId, quantity: l.qty });
+    }
+    const btn = $("#checkoutBtn");
+    btn.disabled = true;
+    try {
+      location.href = await window.Catalog.createCheckout(lines);
+    } catch (err) {
+      btn.disabled = false;
+      window.toast("Couldn’t start checkout — please try again.");
+    }
+  }
+
   function wire() {
     $("#cartRows").querySelectorAll(".cart-page-item").forEach((r) => {
       const key = r.dataset.key;
@@ -128,8 +153,9 @@
       }
     });
 
-    $("#checkoutBtn").addEventListener("click", () =>
-      window.toast("This is a redesign concept — checkout isn’t wired up.", "Keep browsing", "shop.html"));
+    $("#checkoutBtn").addEventListener("click", () => {
+      window.Auth.requireLogin(() => goToCheckout(), "checkout");
+    });
   }
 
   document.addEventListener("chrome:ready", render, { once: true });
