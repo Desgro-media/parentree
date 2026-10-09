@@ -32,12 +32,17 @@
 
   $("#addAllBtn").addEventListener("click", () => {
     const items = S.wish.map((id) => window.getProduct(id)).filter(Boolean);
-    items.forEach((p) => {
-      const color = p.colors && p.colors[0] ? p.colors[0][0] : "";
-      const size = p.sizes && p.sizes.length ? p.sizes[Math.min(1, p.sizes.length - 1)] : "";
-      S.addToCart(p.id, { color, size, qty: 1 });
-    });
-    window.toast(`Added ${items.length} ${items.length === 1 ? "item" : "items"} to your basket`, "Checkout", "cart.html");
+    const tally = { added: 0, choose: 0, soldout: 0 };
+    items.forEach((p) => { tally[window.addDefault(p)]++; });
+
+    const notes = [];
+    if (tally.choose) notes.push(`${tally.choose} need${tally.choose === 1 ? "s" : ""} a size — open ${tally.choose === 1 ? "it" : "them"} to choose`);
+    if (tally.soldout) notes.push(`${tally.soldout} sold out`);
+    const head = tally.added
+      ? `Added ${tally.added} ${tally.added === 1 ? "item" : "items"} to your basket`
+      : "Nothing added";
+    window.toast(head + (notes.length ? " · " + notes.join(" · ") : ""),
+      tally.added ? "Checkout" : "", tally.added ? "cart.html" : "");
   });
 
   document.addEventListener("chrome:ready", render, { once: true });

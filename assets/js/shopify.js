@@ -10,22 +10,34 @@
 
   const SHOPIFY_DOMAIN = "a9mpaw-sd.myshopify.com";
   const STOREFRONT_TOKEN = "50653f6a245c68db2733ce97f0d4d627";
-  const API_VERSION = "2024-10";
+  /* Shopify supports each API version for ~12 months and silently serves the
+     oldest supported one after that (2024-10 was already being served as
+     2025-10). Bump this a couple of times a year and re-test the two queries. */
+  const API_VERSION = "2026-07";
   const ENDPOINT = `https://${SHOPIFY_DOMAIN}/api/${API_VERSION}/graphql.json`;
 
-  async function shopifyFetch(query, variables) {
-    const res = await fetch(ENDPOINT, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-Shopify-Storefront-Access-Token": STOREFRONT_TOKEN,
-      },
-      body: JSON.stringify({ query, variables }),
-    });
-    if (!res.ok) throw new Error("Shopify Storefront API error " + res.status);
-    const json = await res.json();
-    if (json.errors) throw new Error(json.errors.map((e) => e.message).join("; "));
-    return json.data;
+  async function shopifyFetch(query, variables, timeoutMs = 8000) {
+    /* no timeout would let a stalled request hold every page hostage, since
+       app.js waits on Catalog.ready before rendering */
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), timeoutMs);
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Shopify-Storefront-Access-Token": STOREFRONT_TOKEN,
+        },
+        body: JSON.stringify({ query, variables }),
+        signal: ctl.signal,
+      });
+      if (!res.ok) throw new Error("Shopify Storefront API error " + res.status);
+      const json = await res.json();
+      if (json.errors) throw new Error(json.errors.map((e) => e.message).join("; "));
+      return json.data;
+    } finally {
+      clearTimeout(timer);
+    }
   }
 
   /* option values from Shopify are plain strings ("Sage", "Rust") with no
@@ -88,29 +100,50 @@
       }
     }`;
 
+  /* The storefront only models two option dimensions: colour and size/age.
+     Name your Shopify options "Color"/"Colour" and "Size"/"Age" — anything else
+     (e.g. "Material") can't be told apart here and is warned about below. */
+  const COLOR_RX = /colou?r/i;
+  const SIZE_RX = /^(size|age)/i;
+
   function mapProduct(node) {
     const images = node.images.edges.map((e) => e.node.url);
-    const variants = node.variants.edges.map((e) => e.node);
-    const firstAvailable = variants.find((v) => v.availableForSale) || variants[0] || null;
-    const price = firstAvailable ? Number(firstAvailable.price.amount) : 0;
-    const mrpRaw = firstAvailable && firstAvailable.compareAtPrice ? Number(firstAvailable.compareAtPrice.amount) : 0;
-    const mrp = mrpRaw > price ? mrpRaw : 0;
-
     const options = node.options || [];
-    const colorOpt = options.find((o) => /colou?r/i.test(o.name));
-    const sizeOpt = options.find((o) => /size|age/i.test(o.name));
+    const colorOpt = options.find((o) => COLOR_RX.test(o.name));
+    const sizeOpt = options.find((o) => SIZE_RX.test(o.name));
 
-    const variantIndex = {};
-    variants.forEach((v) => {
-      const color = (v.selectedOptions.find((o) => /colou?r/i.test(o.name)) || {}).value || "";
-      const size = (v.selectedOptions.find((o) => /size|age/i.test(o.name)) || {}).value || "";
-      variantIndex[color + "::" + size] = v.id;
+    const optValue = (v, rx) => (v.selectedOptions.find((o) => rx.test(o.name)) || {}).value || "";
+    const variants = node.variants.edges.map((e) => {
+      const v = e.node;
+      const price = Number(v.price.amount);
+      const cmp = v.compareAtPrice ? Number(v.compareAtPrice.amount) : 0;
+      return {
+        id: v.id,
+        available: v.availableForSale,
+        price,
+        mrp: cmp > price ? cmp : 0,
+        color: optValue(v, COLOR_RX),
+        size: optValue(v, SIZE_RX),
+      };
     });
+
+    const unmodelled = options.filter((o) => o !== colorOpt && o !== sizeOpt && o.values.length > 1);
+    if (unmodelled.length) {
+      console.warn(`Shopify product "${node.handle}" varies by ${unmodelled.map((o) => o.name).join(", ")}, ` +
+        "which the storefront can't select — rename the option to Color/Size or split the product.");
+    }
+
+    /* listing price = cheapest purchasable variant (all variants if sold out) */
+    const pool = variants.some((v) => v.available) ? variants.filter((v) => v.available) : variants;
+    const shown = pool.reduce((a, b) => (b.price < a.price ? b : a), pool[0] || { price: 0, mrp: 0 });
+    const price = shown.price;
+    const mrp = shown.mrp;
 
     return {
       id: node.handle,
-      variantId: firstAvailable ? firstAvailable.id : null,
-      variantIndex,
+      variants,
+      soldOut: variants.length > 0 && !variants.some((v) => v.available),
+      priceVaries: variants.some((v) => v.price !== variants[0].price),
       name: node.title,
       cat: guessCategory(node.productType || "", node.tags || []),
       price, mrp,
@@ -136,21 +169,61 @@
     return out;
   }
 
-  /* real Shopify-hosted checkout — used only once live products are in cart */
+  /* Which Shopify variant does a basket line ({color, size}) point at?
+     Returns null rather than guessing — a wrong-size order is worse than a
+     blocked checkout. Static demo products have no `variants` and return null. */
+  function resolveVariant(product, sel) {
+    const vs = (product && product.variants) || [];
+    if (!vs.length) return null;
+    if (vs.length === 1) return vs[0];
+    const color = (sel && sel.color) || "", size = (sel && sel.size) || "";
+    const hits = vs.filter((v) => v.color === color && v.size === size);
+    return hits.find((v) => v.available) || hits[0] || null;
+  }
+
+  /* real Shopify-hosted checkout — used only once live products are in cart.
+     Shopify does NOT reject sold-out lines: it returns a cart with quantity 0
+     (or a reduced quantity) plus a `warnings` entry and an empty-looking
+     checkout URL. So compare what came back with what we asked for. */
   async function createCheckout(lines) {
     const mutation = `
       mutation CreateCart($lines: [CartLineInput!]!) {
         cartCreate(input: { lines: $lines }) {
-          cart { checkoutUrl }
+          cart {
+            checkoutUrl
+            lines(first: 100) {
+              edges { node { quantity merchandise { ... on ProductVariant { id } } } }
+            }
+          }
           userErrors { message }
+          warnings { code message }
         }
       }`;
     const data = await shopifyFetch(mutation, {
       lines: lines.map((l) => ({ merchandiseId: l.variantId, quantity: l.quantity })),
+    }, 15000);
+    const out = data.cartCreate;
+    if (out.userErrors && out.userErrors.length) {
+      throw new Error(out.userErrors.map((e) => e.message).join("; "));
+    }
+
+    const got = {};
+    out.cart.lines.edges.forEach((e) => {
+      const id = e.node.merchandise && e.node.merchandise.id;
+      if (id) got[id] = (got[id] || 0) + e.node.quantity;
     });
-    const errs = data.cartCreate.userErrors;
-    if (errs && errs.length) throw new Error(errs.map((e) => e.message).join("; "));
-    return data.cartCreate.cart.checkoutUrl;
+    const want = {};
+    lines.forEach((l) => { want[l.variantId] = (want[l.variantId] || 0) + l.quantity; });
+    const short = Object.keys(want).some((id) => (got[id] || 0) < want[id]);
+
+    if (short || (out.warnings && out.warnings.length)) {
+      const err = new Error("Basket changed at checkout");
+      err.code = "UNAVAILABLE";
+      err.userMessage = (out.warnings || []).map((w) => w.message).join(" ")
+        || "Some items in your basket are no longer available in that quantity.";
+      throw err;
+    }
+    return out.cart.checkoutUrl;
   }
 
   let live = false;
@@ -170,6 +243,7 @@
   window.Catalog = {
     ready,
     isLive: () => live,
+    resolveVariant,
     createCheckout,
   };
 })();
