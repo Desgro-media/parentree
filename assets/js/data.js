@@ -6,9 +6,10 @@
 window.SITE = {
   name: "Momira",
   tagline: "Organic",
-  phone: "+91 98765 43210",
-  whatsapp: "919876543210",
-  email: "hello@momiraorganic.com",
+  phone: "+91 9510633232",              // as shown on parentree.co — used for display text everywhere
+  whatsapp: "919510633232",             // digits only, country code first — builds the wa.me link
+  email: "parentreeorganics@gmail.com", // as shown on parentree.co
+  instagram: "https://www.instagram.com/parentree.organics/", // footer icon (index.html's community section has the same URL written out, so it works without JS)
   freeGiftThreshold: 2600,
   currency: "₹",
 };
@@ -329,12 +330,16 @@ window.PRODUCTS = [
       features: ["GOTS-certified organic cotton", "Non-pinch cuffs", "Set of 2 pairs"] }),
 ];
 
-/* --- testimonials -------------------------------------------------------- */
-window.TESTIMONIALS = [
-  { name: "Nisha Joshi", city: "Pune", text: "Your organic products are just WOW — the material is buttery soft and my baby just loves it. I introduced this brand to my friends and now we are all frequent customers." },
-  { name: "Janvi Gupta", city: "Delhi", text: "My friend gifted me a set at my baby shower and I am in love. Superb quality essentials, the fabric is ultra soft. This was the purest gift for my baby. You've got a permanent customer." },
-  { name: "Dr. Shreya Patel", city: "Ahmedabad", text: "My baby has sensitive skin and these essentials have been a saviour. Ten times softer than anything else we tried, and the GOTS certification gave me real peace of mind." },
-  { name: "Rahul Jain", city: "Jaipur", text: "I was amazed by the quality. The plant-based dyes are a beautiful touch — safe and gentle for my little one. Rare to find this quality with a true commitment to sustainability." },
+/* --- seed reviews --------------------------------------------------------
+   Existing customer stories, shown until customers write their own. They are not
+   tied to a product (productId: null). Everything else — the home-page slideshow,
+   the product-page review sections, the star counts on cards — reads reviews
+   through window.Reviews (see reviews.js), never from this list directly. */
+window.REVIEWS_SEED = [
+  { id: "seed-1", productId: null, name: "Nisha Joshi", city: "Pune", rating: 5, verified: true, text: "Your organic products are just WOW — the material is buttery soft and my baby just loves it. I introduced this brand to my friends and now we are all frequent customers." },
+  { id: "seed-2", productId: null, name: "Janvi Gupta", city: "Delhi", rating: 5, verified: true, text: "My friend gifted me a set at my baby shower and I am in love. Superb quality essentials, the fabric is ultra soft. This was the purest gift for my baby. You've got a permanent customer." },
+  { id: "seed-3", productId: null, name: "Dr. Shreya Patel", city: "Ahmedabad", rating: 5, verified: true, text: "My baby has sensitive skin and these essentials have been a saviour. Ten times softer than anything else we tried, and the GOTS certification gave me real peace of mind." },
+  { id: "seed-4", productId: null, name: "Rahul Jain", city: "Jaipur", rating: 5, verified: true, text: "I was amazed by the quality. The plant-based dyes are a beautiful touch — safe and gentle for my little one. Rare to find this quality with a true commitment to sustainability." },
 ];
 
 /* --- lookup helpers ---------------------------------------------------- */

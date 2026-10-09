@@ -41,6 +41,7 @@
     instagram:'M4 8a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4v8a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4V8Zm8 2.5a3.5 3.5 0 1 0 0 7 3.5 3.5 0 0 0 0-7ZM17 6.5h.01',
     whatsapp:'M12 4a8 8 0 0 0-6.9 12l-1 3.6 3.7-1A8 8 0 1 0 12 4Zm3.4 10.9c-.2.5-1 1-1.5 1-.4 0-.9.2-3-.9s-3.3-3.4-3.5-3.6-1-1.3-1-2.5.6-1.8.9-2 .5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 1.9c0 .2.1.4 0 .5l-.4.6c-.2.2-.3.4-.1.7s.7 1.2 1.5 1.9c1 .9 1.8 1.1 2 1.2s.4 0 .5-.1l.7-.8c.2-.3.4-.2.6-.1l1.8.9c.3.1.4.2.5.3s0 .6-.1 1Z',
     play:    'M8 5v14l11-7L8 5Z',
+    pause:   'M9 5v14M15 5v14',
     ribbon:  'M12 15a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm-3 .8L7 22l5-2 5 2-2-6.2',
     refresh: 'M4 12a8 8 0 0 1 13.7-5.7L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.7L4 16m0 4v-4h4',
     // filled mobile-nav icons — 24x24, bespoke
@@ -91,6 +92,7 @@
   window.money = money;
   const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  window.escHtml = escHtml; // user-written text (reviews) must always go through this before it reaches innerHTML
 
   function stars(rating, size) {
     const full = Math.round(rating);
@@ -114,15 +116,39 @@
       document.dispatchEvent(new CustomEvent("store:change"));
     },
     cartCount() { return this.cart.reduce((n, l) => n + l.qty, 0); },
+    /* the Shopify variant a basket line points at (null for static demo products) */
+    variantOf(l) {
+      const p = window.getProduct(l.id);
+      return p && window.Catalog ? window.Catalog.resolveVariant(p, l) : null;
+    },
+    /* variants of one product can be priced differently, so price per line */
+    unitPrice(l) {
+      const p = window.getProduct(l.id); if (!p) return 0;
+      const v = this.variantOf(l); return v ? v.price : p.price;
+    },
+    unitMrp(l) {
+      const p = window.getProduct(l.id); if (!p) return 0;
+      const v = this.variantOf(l); return v ? (v.mrp || v.price) : (p.mrp || p.price);
+    },
     cartSubtotal() {
-      return this.cart.reduce((s, l) => {
-        const p = window.getProduct(l.id); return s + (p ? p.price * l.qty : 0);
-      }, 0);
+      return this.cart.reduce((s, l) => s + this.unitPrice(l) * l.qty, 0);
     },
     cartMrpTotal() {
-      return this.cart.reduce((s, l) => {
-        const p = window.getProduct(l.id); return s + (p ? (p.mrp || p.price) * l.qty : 0);
-      }, 0);
+      return this.cart.reduce((s, l) => s + this.unitMrp(l) * l.qty, 0);
+    },
+    /* Drop lines that no longer exist in the live catalog (a demo item saved
+       before launch, a deleted product, a renamed size). Only called once the
+       live catalog has loaded — never on the demo fallback, or a flaky
+       connection would wipe a real customer's basket. Returns how many went. */
+    pruneUnknown() {
+      const before = this.cart.length;
+      this.cart = this.cart.filter((l) => {
+        const p = window.getProduct(l.id);
+        return p && (!p.variants || window.Catalog.resolveVariant(p, l));
+      });
+      const dropped = before - this.cart.length;
+      if (dropped) this._emit();
+      return dropped;
     },
     lineKey(id, color, size) { return [id, color || "", size || ""].join("::"); },
     addToCart(id, opts = {}) {
@@ -155,18 +181,20 @@
 
   /* ------------------------------------------------------------------ toast */
   let toastWrap;
-  function toast(msg, actionLabel, actionHref) {
+  /* tone "error" swaps the tick for a cross and stays a little longer */
+  function toast(msg, actionLabel, actionHref, tone) {
     if (!toastWrap) {
       toastWrap = document.createElement("div");
       toastWrap.className = "toast-wrap";
       document.body.appendChild(toastWrap);
     }
+    const err = tone === "error";
     const el = document.createElement("div");
-    el.className = "toast";
-    el.innerHTML = icon("check") + `<span>${msg}</span>`
+    el.className = "toast" + (err ? " toast--error" : "");
+    el.innerHTML = icon(err ? "close" : "check") + `<span>${msg}</span>`
       + (actionLabel ? `<a href="${actionHref || "#"}">${actionLabel}</a>` : "");
     toastWrap.appendChild(el);
-    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, 3200);
+    setTimeout(() => { el.classList.add("out"); setTimeout(() => el.remove(), 320); }, err ? 5500 : 3200);
   }
   window.toast = toast;
 
@@ -223,6 +251,24 @@
       </div>`;
     document.body.prepend(header);
 
+    /* announcement marquee — sits above the floating header on every page. The
+       message set is tripled per row so one row is always wider than the screen;
+       the track scrolls -50% (one row) for a seamless loop. */
+    const msgs = [
+      "New collection — premium organic quality",
+      `Free muslin blanket on orders above ${money(window.SITE.freeGiftThreshold)}`,
+      "Free delivery on all orders",
+      "GOTS-certified organic cotton",
+    ];
+    const msgRow = msgs.map((m) => `<span>${m}</span>`).join("").repeat(3);
+    const bar = document.createElement("div");
+    bar.className = "announce";
+    bar.innerHTML = `<p class="sr-only">${msgs.join(". ")}.</p>
+      <div class="announce__track" aria-hidden="true">
+        <div class="announce__row">${msgRow}</div><div class="announce__row">${msgRow}</div>
+      </div>`;
+    document.body.prepend(bar);
+
     /* footer */
     const main = $("main") || document.body;
     main.insertAdjacentHTML("afterend", footerHTML());
@@ -242,8 +288,8 @@
           <a href="shop.html">Shop all products ${icon("chevRight")}</a>
         </nav>
         <div class="mobile-drawer__foot">
-          <a href="https://wa.me/919876543210">${icon("whatsapp")} +91 98765 43210</a>
-          <a href="mailto:hello@momiraorganic.com">${icon("mail")} hello@momiraorganic.com</a>
+          <a href="https://wa.me/${window.SITE.whatsapp}">${icon("whatsapp")} ${window.SITE.phone}</a>
+          <a href="mailto:${window.SITE.email}">${icon("mail")} ${window.SITE.email}</a>
         </div>
       </aside>
 
@@ -350,9 +396,9 @@
             <span class="brand__name"><b>momira</b><span>Organic</span></span></a>
           <p>GOTS-certified organic cotton sleepwear for newborns and little ones — made soft, made safe, made to be handed down.</p>
           <div class="footer-social">
-            <a href="https://instagram.com" aria-label="Instagram">${icon("instagram")}</a>
-            <a href="https://wa.me/919876543210" aria-label="WhatsApp">${icon("whatsapp")}</a>
-            <a href="mailto:hello@momiraorganic.com" aria-label="Email">${icon("mail")}</a>
+            <a href="${window.SITE.instagram}" target="_blank" rel="noopener" aria-label="Instagram">${icon("instagram")}</a>
+            <a href="https://wa.me/${window.SITE.whatsapp}" aria-label="WhatsApp">${icon("whatsapp")}</a>
+            <a href="mailto:${window.SITE.email}" aria-label="Email">${icon("mail")}</a>
           </div>
         </div>
         <div class="footer-col">
@@ -373,8 +419,8 @@
         </div>
         <div class="footer-col">
           <h4>Reach us</h4>
-          <a href="https://wa.me/919876543210">+91 98765 43210</a>
-          <a href="mailto:hello@momiraorganic.com">hello@momiraorganic.com</a>
+          <a href="https://wa.me/${window.SITE.whatsapp}">${window.SITE.phone}</a>
+          <a href="mailto:${window.SITE.email}">${window.SITE.email}</a>
           <a href="#">Mon–Sat, 10am–6pm IST</a>
         </div>
       </div>
@@ -471,6 +517,9 @@
       if (reason === "checkout") {
         titleEl.textContent = "Sign in to check out";
         subtitleEl.textContent = "Create an account or sign in to complete your order.";
+      } else if (reason === "review") {
+        titleEl.textContent = "Sign in to write a review";
+        subtitleEl.textContent = "Reviews come from real accounts — it takes a moment to sign in or create one.";
       } else {
         titleEl.textContent = "Welcome to Momira";
         subtitleEl.textContent = "Sign in or create an account.";
@@ -607,6 +656,7 @@
       <div>
         <div class="cart-item__name">${p.name}</div>
         ${opt ? `<div class="cart-item__opt">${opt}</div>` : ""}
+        ${(Store.variantOf(l) || {}).available === false ? `<div class="cart-item__opt" style="color:var(--clay);font-weight:700">Sold out — remove to check out</div>` : ""}
         <div class="qty">
           <button data-dec aria-label="Decrease">${icon("minus")}</button>
           <span>${l.qty}</span>
@@ -614,7 +664,7 @@
         </div>
       </div>
       <div style="text-align:right">
-        <div class="cart-item__price">${money(p.price * l.qty)}</div>
+        <div class="cart-item__price">${money(Store.unitPrice(l) * l.qty)}</div>
         <button class="cart-item__remove" data-rm>Remove</button>
       </div>
     </div>`;
@@ -632,25 +682,29 @@
   /* -------------------------------------------------------- product card */
   function productCard(p, opts = {}) {
     const catLabel = (window.CATEGORIES.find((c) => c.slug === p.cat) || {}).label || "";
-    const badgeCls = p.badge === "Sale" ? " card__badge--sale"
+    const badge = p.soldOut ? "Sold out" : p.badge;
+    const badgeCls = p.soldOut ? " card__badge--soldout"
+      : p.badge === "Sale" ? " card__badge--sale"
       : /bestseller/i.test(p.badge || "") ? " card__badge--bestseller" : "";
     const sw = (p.colors || []).slice(0, 4)
       .map((c) => `<i style="background:${c[1]}"></i>`).join("");
     const wished = Store.inWish(p.id);
-    return `<article class="card${opts.reveal ? " reveal" : ""}">
+    /* catalogue rating + any reviews customers have written (see reviews.js) */
+    const rs = window.Reviews ? window.Reviews.stats(p) : { count: p.reviews, average: p.rating };
+    return `<article class="card${opts.reveal ? " reveal" : ""}${p.soldOut ? " card--soldout" : ""}">
       <div class="card__media">
-        ${p.badge ? `<span class="card__badge${badgeCls}">${p.badge}</span>` : ""}
+        ${badge ? `<span class="card__badge${badgeCls}">${badge}</span>` : ""}
         <button class="card__wish${wished ? " is-active" : ""}" data-wish-btn="${p.id}" aria-pressed="${wished}" aria-label="Save ${p.name}">${icon("heart")}</button>
         <img src="${p.img}" alt="${p.name}" loading="lazy" width="800" height="800">
-        <button class="card__add" data-quick-add="${p.id}" aria-label="Add ${p.name} to basket">${icon("plus")}</button>
+        ${p.soldOut ? "" : `<button class="card__add" data-quick-add="${p.id}" aria-label="Add ${p.name} to basket">${icon("plus")}</button>`}
       </div>
       <div class="card__body">
         <span class="card__cat">${catLabel}</span>
         <h3 class="card__name"><a href="product.html?id=${p.id}">${p.name}</a></h3>
-        ${p.reviews ? `<div class="rating-line">${stars(p.rating, 12)} <span>(${p.reviews})</span></div>` : ""}
+        ${rs.count ? `<div class="rating-line">${stars(rs.average, 12)} <span>(${rs.count})</span></div>` : ""}
         ${sw ? `<div class="card__swatches">${sw}</div>` : ""}
         <div class="card__meta">
-          <span class="card__price">${money(p.price)}</span>
+          <span class="card__price">${p.priceVaries ? "From " : ""}${money(p.price)}</span>
           ${p.mrp && p.mrp > p.price ? `<span class="card__mrp">${money(p.mrp)}</span>
             <span class="card__off">-${p.discount}%</span>` : ""}
         </div>
@@ -673,14 +727,41 @@
     if (qa) {
       e.preventDefault();
       const p = window.getProduct(qa.dataset.quickAdd);
-      const color = p.colors && p.colors[0] ? p.colors[0][0] : "";
-      const size = p.sizes && p.sizes.length ? p.sizes[Math.min(1, p.sizes.length - 1)] : "";
-      Store.addToCart(p.id, { color, size, qty: 1 });
-      toast(`Added ${p.name.split("—")[0].trim()} to basket`, "Checkout", "cart.html");
+      const short = p.name.split("—")[0].trim();
+      const r = addDefault(p);
+      if (r === "choose") { location.href = "product.html?id=" + encodeURIComponent(p.id); return; }
+      if (r === "soldout") { toast(`${short} is sold out`); return; }
+      toast(`Added ${short} to basket`, "Checkout", "cart.html");
       const cd = $("#cartDrawer");
       if (cd) { $("[data-scrim]").classList.add("open"); cd.classList.add("open"); document.body.classList.add("no-scroll"); }
     }
   });
+
+  /* First colour that's actually in stock (PDP and quick-add both default to it). */
+  function defaultColor(p) {
+    const colors = (p.colors || []).map((c) => c[0]);
+    if (!colors.length) return "";
+    const vs = p.variants;
+    return (vs && colors.find((c) => vs.some((v) => v.color === c && v.available))) || colors[0];
+  }
+  window.defaultColor = defaultColor;
+
+  /* Add a product without asking the customer anything — but only when there's
+     nothing to choose. A size is a real decision (wrong size = a return), so
+     multi-size products send the customer to the product page instead of
+     guessing. Returns "added" | "choose" | "soldout". */
+  function addDefault(p) {
+    if (p.soldOut) return "soldout";
+    if (p.sizes && p.sizes.length > 1) return "choose";
+    const color = defaultColor(p), size = (p.sizes && p.sizes[0]) || "";
+    if (p.variants) {
+      const v = window.Catalog.resolveVariant(p, { color, size });
+      if (!v || !v.available) return "soldout";
+    }
+    Store.addToCart(p.id, { color, size, qty: 1 });
+    return "added";
+  }
+  window.addDefault = addDefault;
 
   document.addEventListener("store:change", () => { syncBadges(); renderCartDrawer(); });
 
@@ -713,8 +794,10 @@
        wait for it so pages that read window.PRODUCTS on chrome:ready see
        the final catalogue rather than a half-loaded one. */
     Promise.resolve(window.Catalog && window.Catalog.ready).then(() => {
+      const dropped = window.Catalog && window.Catalog.isLive() ? Store.pruneUnknown() : 0;
       renderCartDrawer();
       document.dispatchEvent(new CustomEvent("chrome:ready"));
+      if (dropped) toast(`${dropped} ${dropped === 1 ? "item" : "items"} in your basket ${dropped === 1 ? "is" : "are"} no longer available and ${dropped === 1 ? "was" : "were"} removed`);
     });
   });
 })();

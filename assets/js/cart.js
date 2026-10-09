@@ -24,6 +24,7 @@
     const sub = S.cartSubtotal();
     const mrp = S.cartMrpTotal();
     const saved = mrp - sub;
+    const blocked = S.cart.some(soldOut);
     const left = Math.max(0, TH - sub);
     const pct = Math.min(100, Math.round((sub / TH) * 100));
     const count = S.cartCount();
@@ -63,7 +64,8 @@
 
           <div class="summary__line summary__line--total"><span>Total</span><span id="grandTotal">${money(sub)}</span></div>
 
-          <button class="btn btn--ink btn--block btn--lg" id="checkoutBtn" style="margin-top:8px">
+          ${blocked ? `<p style="font-size:.84rem;color:var(--clay);font-weight:700;margin:8px 0 0">Remove the sold-out items above to continue.</p>` : ""}
+          <button class="btn btn--ink btn--block btn--lg" id="checkoutBtn" style="margin-top:8px"${blocked ? " disabled" : ""}>
             Proceed to checkout ${window.icon("arrowRight")}</button>
 
           <div class="pdp__assurances" style="margin-top:16px">
@@ -77,16 +79,21 @@
     window.hydrateIcons(root);
   }
 
+  /* a live-catalog line whose variant Shopify reports as out of stock */
+  const soldOut = (l) => (S.variantOf(l) || {}).available === false;
+
   function row(l) {
     const p = window.getProduct(l.id);
     if (!p) return "";
     const key = S.lineKey(l.id, l.color, l.size);
     const opt = [l.color, l.size].filter(Boolean).join(" · ");
+    const unit = S.unitPrice(l), unitMrp = S.unitMrp(l);
     return `<article class="cart-page-item" data-key="${key}">
       <a href="product.html?id=${p.id}"><img src="${p.img}" alt="${p.name}" loading="lazy"></a>
       <div>
         <h3><a href="product.html?id=${p.id}">${p.name}</a></h3>
         ${opt ? `<p style="color:var(--muted);font-size:.84rem;margin-top:4px">${opt}</p>` : ""}
+        ${soldOut(l) ? `<p style="color:var(--clay);font-size:.84rem;font-weight:700;margin-top:4px">Sold out</p>` : ""}
         <div class="qty" style="margin-top:12px">
           <button data-dec aria-label="Decrease">${window.icon("minus")}</button>
           <span>${l.qty}</span>
@@ -95,34 +102,37 @@
         <button class="cart-item__remove" data-rm style="margin-top:10px">Remove</button>
       </div>
       <div style="text-align:right">
-        <div class="cart-item__price">${money(p.price * l.qty)}</div>
-        ${p.mrp > p.price ? `<div class="card__mrp">${money(p.mrp * l.qty)}</div>` : ""}
+        <div class="cart-item__price">${money(unit * l.qty)}</div>
+        ${unitMrp > unit ? `<div class="card__mrp">${money(unitMrp * l.qty)}</div>` : ""}
       </div>
     </article>`;
   }
 
   async function goToCheckout() {
-    if (!window.Catalog || !window.Catalog.isLive()) {
+    const C = window.Catalog;
+    if (!C || !C.isLive()) {
       window.toast("This is a redesign concept — checkout isn’t wired up.", "Keep browsing", "shop.html");
       return;
     }
     const lines = [];
     for (const l of S.cart) {
       const p = window.getProduct(l.id);
-      const variantId = p && p.variantIndex ? (p.variantIndex[(l.color || "") + "::" + (l.size || "")] || p.variantId) : null;
-      if (!variantId) {
-        window.toast("This is a redesign concept — checkout isn’t wired up.", "Keep browsing", "shop.html");
+      const v = p && C.resolveVariant(p, l);
+      if (!v || !v.available) {
+        render();
+        window.toast("Some items in your basket are no longer available — please review them.", "", "", "error");
         return;
       }
-      lines.push({ variantId, quantity: l.qty });
+      lines.push({ variantId: v.id, quantity: l.qty });
     }
     const btn = $("#checkoutBtn");
     btn.disabled = true;
+    btn.textContent = "Taking you to secure checkout…";
     try {
-      location.href = await window.Catalog.createCheckout(lines);
+      location.href = await C.createCheckout(lines);
     } catch (err) {
-      btn.disabled = false;
-      window.toast("Couldn’t start checkout — please try again.");
+      render(); // restores the button
+      window.toast(err.code === "UNAVAILABLE" ? err.userMessage : "Couldn’t start checkout — please try again.", "", "", "error");
     }
   }
 
@@ -153,11 +163,12 @@
       }
     });
 
-    $("#checkoutBtn").addEventListener("click", () => {
-      window.Auth.requireLogin(() => goToCheckout(), "checkout");
-    });
+    $("#checkoutBtn").addEventListener("click", goToCheckout);
   }
 
   document.addEventListener("chrome:ready", render, { once: true });
   document.addEventListener("store:change", render);
+  /* coming back from Shopify's checkout with the browser's Back button restores
+     this page from bfcache with the button still stuck on "Taking you to…" */
+  window.addEventListener("pageshow", (e) => { if (e.persisted) render(); });
 })();
