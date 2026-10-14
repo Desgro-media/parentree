@@ -44,6 +44,11 @@
     pause:   'M9 5v14M15 5v14',
     ribbon:  'M12 15a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm-3 .8L7 22l5-2 5 2-2-6.2',
     refresh: 'M4 12a8 8 0 0 1 13.7-5.7L20 8M20 4v4h-4M20 12a8 8 0 0 1-13.7 5.7L4 16m0 4v-4h4',
+    ruler:   'M3 16 16 3l5 5L8 21 3 16Zm4-1 2 2m1-5 2 2m1-5 2 2',
+    cotton:  'M8 14a3 3 0 0 1-.8-5.8A3.8 3.8 0 0 1 12 5a3.8 3.8 0 0 1 4.8 3.2A3 3 0 0 1 16 14ZM8 14l-2.5 5.5L12 17l6 2.5L16 14M12 17v4',
+    cart:    'M3 4h2.5l2 11h10.5l2-8H6.500M9.500 20a.8.8 0 1 0 0 .01M17 20a.8.8 0 1 0 0 .01',
+    weave:   'M3 9h18M3 15h18M9 3v18M15 3v18',
+    snowTemp:'M10 15V5a2 2 0 1 0-4 0v10a4 4 0 1 0 4 0ZM18 6v7M15 7.8l6 3.4M21 7.8l-6 3.4',
     // filled mobile-nav icons — 24x24, bespoke
     nHome:   'M4 11.2 12 4l8 7.2V20a1 1 0 0 1-1 1h-4v-5a3 3 0 0 0-6 0v5H5a1 1 0 0 1-1-1v-8.8Z',
     nShop:   'M5 8h14l1.2 11.1a1.5 1.5 0 0 1-1.5 1.7H5.3a1.5 1.5 0 0 1-1.5-1.7L5 8Zm3.2 0a3.8 3.8 0 0 1 7.6 0',
@@ -93,6 +98,13 @@
   const escHtml = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (c) =>
     ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
   window.escHtml = escHtml; // user-written text (reviews) must always go through this before it reaches innerHTML
+
+  /* How a size is shown to the customer: "6-12m" → "6 to 12 months", "1-2y" → "1-2 Years".
+     Display only — the stored value (basket, Shopify variant lookup) stays as written. Anything
+     else (Shopify's own wording, "One size", "120 × 120 cm") passes through untouched. */
+  window.sizeLabel = (s) => String(s == null ? "" : s)
+    .replace(/^(\d+)\s*-\s*(\d+)\s*m$/i, "$1 to $2 months")
+    .replace(/^(\d+)\s*-\s*(\d+)\s*y$/i, "$1-$2 Years");
 
   function stars(rating, size) {
     const full = Math.round(rating);
@@ -650,7 +662,7 @@
   function cartRow(l) {
     const p = window.getProduct(l.id); if (!p) return "";
     const key = Store.lineKey(l.id, l.color, l.size);
-    const opt = [l.color, l.size].filter(Boolean).join(" · ");
+    const opt = [l.color, window.sizeLabel(l.size)].filter(Boolean).join(" · ");
     return `<div class="cart-item" data-key="${key}">
       <img class="cart-item__img" src="${p.img}" alt="${p.name}" loading="lazy">
       <div>

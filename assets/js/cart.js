@@ -86,7 +86,7 @@
     const p = window.getProduct(l.id);
     if (!p) return "";
     const key = S.lineKey(l.id, l.color, l.size);
-    const opt = [l.color, l.size].filter(Boolean).join(" · ");
+    const opt = [l.color, window.sizeLabel(l.size)].filter(Boolean).join(" · ");
     const unit = S.unitPrice(l), unitMrp = S.unitMrp(l);
     return `<article class="cart-page-item" data-key="${key}">
       <a href="product.html?id=${p.id}"><img src="${p.img}" alt="${p.name}" loading="lazy"></a>
@@ -123,7 +123,7 @@
         window.toast("Some items in your basket are no longer available — please review them.", "", "", "error");
         return;
       }
-      lines.push({ variantId: v.id, quantity: l.qty });
+      lines.push({ variantId: v.id, quantity: l.qty, sizeNote: p.sizeIsNote ? window.sizeLabel(l.size) : "" });
     }
     const btn = $("#checkoutBtn");
     btn.disabled = true;
