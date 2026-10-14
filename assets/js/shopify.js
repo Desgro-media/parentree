@@ -106,6 +106,12 @@
   const COLOR_RX = /colou?r/i;
   const SIZE_RX = /^(size|age)/i;
 
+  /* A product with no Size option in Shopify still gets a size picker (the standard baby ages).
+     Those sizes aren't variants, so they travel to checkout as a "Size" note on the order line
+     (`sizeIsNote`) and are ignored when picking the variant. Give the product a real Size
+     option in Shopify and it takes over. */
+  const FALLBACK_SIZES = ["6-12m", "1-2y", "2-3y", "3-4y", "4-5y", "5-6y", "6-7y"];
+
   function mapProduct(node) {
     const images = node.images.edges.map((e) => e.node.url);
     const options = node.options || [];
@@ -152,7 +158,8 @@
       badge: guessBadge(node.tags || []),
       rating: 0, reviews: 0,
       colors: colorOpt ? colorOpt.values.map((v) => [v, colorHex(v)]) : [],
-      sizes: sizeOpt ? sizeOpt.values : [],
+      sizes: sizeOpt ? sizeOpt.values : FALLBACK_SIZES,
+      sizeIsNote: !sizeOpt,
       blurb: node.description || "",
       features: [],
     };
@@ -177,7 +184,7 @@
     if (!vs.length) return null;
     if (vs.length === 1) return vs[0];
     const color = (sel && sel.color) || "", size = (sel && sel.size) || "";
-    const hits = vs.filter((v) => v.color === color && v.size === size);
+    const hits = vs.filter((v) => v.color === color && (product.sizeIsNote || v.size === size));
     return hits.find((v) => v.available) || hits[0] || null;
   }
 
@@ -200,7 +207,10 @@
         }
       }`;
     const data = await shopifyFetch(mutation, {
-      lines: lines.map((l) => ({ merchandiseId: l.variantId, quantity: l.quantity })),
+      lines: lines.map((l) => ({
+        merchandiseId: l.variantId, quantity: l.quantity,
+        ...(l.sizeNote ? { attributes: [{ key: "Size", value: l.sizeNote }] } : {}),
+      })),
     }, 15000);
     const out = data.cartCreate;
     if (out.userErrors && out.userErrors.length) {
@@ -231,6 +241,7 @@
     try {
       const nodes = await fetchAllProducts();
       if (nodes.length) {
+        window.DEMO_PRODUCTS = window.PRODUCTS; // product.js uses these to fill "frequently bought together" while the store is small
         window.PRODUCTS = nodes.map(mapProduct);
         live = true;
       }

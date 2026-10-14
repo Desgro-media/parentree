@@ -17,6 +17,33 @@
   <nav class="breadcrumb" id="pdpCrumb"><a href="index.html">Home</a> SPRITE_CHEVRIGHT <a href="shop.html">Shop</a></nav>
   <div id="pdpRoot"></div>
 
+  <!-- Why parents choose Momira — shown once a product has loaded (product.js unhides it) -->
+  <section class="baby-ben" id="babyBenefits" aria-labelledby="babyBenTitle" hidden>
+    <h2 class="baby-ben__title" id="babyBenTitle">Your Baby Benefits</h2>
+    <ul class="baby-ben__grid">
+      <li>
+        <span class="baby-ben__ico">SPRITE_COTTON</span>
+        <div><h3>Premium Organic Cotton</h3>
+          <p>Made from the finest certified organic cotton, our clothing ensures the purest, safest quality for your little one.</p></div>
+      </li>
+      <li>
+        <span class="baby-ben__ico">SPRITE_WEAVE</span>
+        <div><h3>Soft and Breathable</h3>
+          <p>Our super-soft and breathable fabric keeps your baby feeling cozy and fresh, perfect for sensitive skin and all-day comfort.</p></div>
+      </li>
+      <li>
+        <span class="baby-ben__ico">SPRITE_LEAF</span>
+        <div><h3>Natural, Skin-Friendly Dyeing Procedure</h3>
+          <p>Dyed with gentle, natural processes, our clothing is as kind to your baby’s skin as it is to the planet.</p></div>
+      </li>
+      <li>
+        <span class="baby-ben__ico">SPRITE_SNOWTEMP</span>
+        <div><h3>Comfortable Fit</h3>
+          <p>Crafted for an easy, comfortable fit that allows your baby to move freely, ensuring ultimate comfort.</p></div>
+      </li>
+    </ul>
+  </section>
+
   <!-- Customer reviews — rendered by product.js from window.Reviews (reviews.js).
        Reviews written here also feed the home page's customer-stories slideshow. -->
   <section class="section section--tight" id="reviews" aria-labelledby="reviewsTitle" hidden></section>
@@ -40,6 +67,7 @@
 <script src="assets/js/auth.js"></script>
 <script src="assets/js/reviews.js"></script>
 <script src="assets/js/app.js"></script>
+<script src="assets/js/size-chart.js"></script>
 <script src="assets/js/product.js"></script>
 </body>
 </html>
